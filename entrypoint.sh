@@ -141,7 +141,6 @@ if [ "$1" = 'rsync_server' ]; then
   [${VOLUME_NAME}]
     uid = root
     gid = root
-    hosts deny = *
     hosts allow = ${HOSTS_ALLOW}
     read only = ${READ_ONLY}
     path = ${VOLUME_PATH}
