@@ -122,7 +122,8 @@ if [ "$1" = 'rsync_server' ]; then
   # Alternalte: generate configuration
   # eval "echo \"$(cat /rsyncd.tpl.conf)\"" > /etc/rsyncd.conf
 
-  [ -f /etc/rsyncd.conf ] || cat <<EOF > /etc/rsyncd.conf
+  # [ -f /etc/rsyncd.conf ] || 
+  cat <<EOF > /etc/rsyncd.conf
   # /etc/rsyncd.conf
 
   # Minimal configuration file for rsync daemon
