@@ -14,7 +14,7 @@ CHROOT=${CHROOT:-no}
 VOLUME_NAME=${VOLUME_NAME:-data}
 CONTAINER_UID=${CONTAINER_UID:-8730}
 CONTAINER_GID=${CONTAINER_GID:-8730}
-USERNAME=${USERNAME:-rsync}
+USERNAME=${USERNAME:-sshacs}
 # PASSWORD=${PASSWORD:-rsync}
 
 ################################################################################
@@ -33,9 +33,9 @@ if [ ! -e $VOLUME_PATH ]; then
   mkdir -p /$VOLUME_PATH
 fi
 
-mkdir -p /root/.ssh
-> /root/.ssh/authorized_keys
-chmod go-rwx /root/.ssh/authorized_keys
+# mkdir -p /root/.ssh
+# > /root/.ssh/authorized_keys
+# chmod go-rwx /root/.ssh/authorized_keys
 # sed -i "s/#PasswordAuthentication yes/PasswordAuthentication no/g" /etc/ssh/sshd_config
 
 # Provide CRON_TASK_* via environment variable
@@ -51,9 +51,17 @@ for item in `env`; do
 done
 
 # Generate host SSH keys
-if [ ! -e /etc/ssh/ssh_host_rsa_key.pub ]; then
-  ssh-keygen -A
+if [ ! -f "/etc/ssh/ssh_host_rsa_key" ]; then
+	# generate fresh rsa key
+	ssh-keygen -f /etc/ssh/ssh_host_rsa_key -N '' -t rsa
 fi
+if [ ! -f "/etc/ssh/ssh_host_dsa_key" ]; then
+	# generate fresh dsa key
+	ssh-keygen -f /etc/ssh/ssh_host_dsa_key -N '' -t dsa
+fi
+
+# generate host keys if not present
+# ssh-keygen -A
 
 # Generate root SSH key
 if [ ! -e /root/.ssh/id_rsa.pub ]; then
@@ -76,21 +84,27 @@ if [ "$1" = 'rsync_server' ]; then
   # START sshd
   ################################################################################
 
-  # Copy authorized keys from ENV variable
-  echo "$AUTHORIZED_KEYS" >$AUTHORIZED_KEYS_FILE
-
   # Prevent the user from changing directory upwards
   sed -i -e '/chrootpath/d' /etc/rssh.conf
   echo "chrootpath = $VOLUME_PATH" >> /etc/rssh.conf
 
   groupmod --non-unique --gid "$CONTAINER_GID" ${CONTAINER_GROUP}
-  usermod --non-unique --home "$VOLUME_PATH" --shell /usr/bin/rssh --uid "$CONTAINER_UID" --gid "$CONTAINER_GID" "$CONTAINER_USER"
+  usermod --non-unique --home "$VOLUME_PATH" --shell /bin/bash --uid "$CONTAINER_UID" --gid "$CONTAINER_GID" "$CONTAINER_USER"
+  # usermod --non-unique --home "$VOLUME_PATH" --shell /usr/bin/rssh --uid "$CONTAINER_UID" --gid "$CONTAINER_GID" "$CONTAINER_USER"
   # Chown data folder (if mounted as a volume for the first time)
   chown "${CONTAINER_USER}:${CONTAINER_GROUP}" "$VOLUME_PATH"
+
+  # Copy authorized keys from ENV variable
+  echo "Writing SSH keys to $AUTHORIZED_KEYS_FILE"
+  echo "$AUTHORIZED_KEYS" >$AUTHORIZED_KEYS_FILE
+  
+  chmod 400 $AUTHORIZED_KEYS_FILE
   chown "${CONTAINER_USER}:${CONTAINER_GROUP}" $AUTHORIZED_KEYS_FILE
 
-  # Run sshd on container start
+  # do not detach (-D), log to stderr (-e), passthrough other arguments
   # exec /usr/sbin/sshd -D -e &
+
+  # Run sshd on container start
   exec /usr/sbin/sshd &
 
   ################################################################################
@@ -109,7 +123,8 @@ if [ "$1" = 'rsync_server' ]; then
     echo "CONTAINER_GID is set forced to: $CONTAINER_GID"
   fi
 
-  echo "root:$PASSWORD" | chpasswd
+  # The user does not have password cannot sshing into the server, see https://superuser.com/questions/1444311/q-root-user-invalid-for-ssh-on-alpine-linux  
+  echo "$USERNAME:$PASSWORD" | chpasswd
 
   # Generate password file
   if [ ! -z $PASSWORD ]; then
