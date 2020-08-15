@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Remove old PID, useful when start after crash or reboot.
+rm -f /var/run/rsyncd.pid
+
 if [ ! -z "${WAIT_INT}" ]; then
   /usr/bin/pipework --wait -i ${WAIT_INT}
 fi
